@@ -9,3 +9,12 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+  # The Go entry, from go-conventions (references/ci.md, Dependabot), which
+  # owns how it lands in .github/dependabot.yml.
+  - package-ecosystem: gomod
+    directory: /plugins/sec-audit/tools
+    schedule:
+      interval: weekly
+    groups:
+      go-dependencies:
+        patterns: ["*"]
