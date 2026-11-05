@@ -1,0 +1,87 @@
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Install Claude Code CLI
+        env:
+          # Pinned so the validator changes only when this line does, as
+          # shellcheck's version below is. Bump by hand.
+          CLAUDE_CODE_VERSION: 2.1.318
+        run: npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+
+      - name: Validate marketplace and plugin
+        run: |
+          claude plugin validate .
+          claude plugin validate plugins/sec-audit
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: plugins/sec-audit/tools/go.mod
+          check-latest: true
+          cache: false
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l plugins/sec-audit/tools)
+          [ -z "$unformatted" ] || { printf 'gofmt needed:\n%s\n' "$unformatted"; exit 1; }
+
+      - name: go vet
+        working-directory: plugins/sec-audit/tools
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.14.0
+          working-directory: plugins/sec-audit/tools
+
+      - name: go test
+        working-directory: plugins/sec-audit/tools
+        run: go test ./...
+
+      - name: shellcheck
+        env:
+          # Pinned so CI and a contributor's local run agree. The runner image
+          # ships its own shellcheck and bumps it without warning. Bump by
+          # hand, with the checksum.
+          SHELLCHECK_VERSION: v0.11.0
+          SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+        run: |
+          tmp=$(mktemp -d)
+          name="shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          curl -fsSL -o "$tmp/$name" \
+            "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/${name}"
+          echo "${SHELLCHECK_SHA256}  $tmp/$name" | sha256sum -c -
+          tar -xJf "$tmp/$name" -C "$tmp" --strip-components=1 \
+            "shellcheck-${SHELLCHECK_VERSION}/shellcheck"
+          "$tmp/shellcheck" --version
+          "$tmp/shellcheck" plugins/sec-audit/tools/run.sh
+
+      - name: markdownlint
+        run: npx --yes markdownlint-cli2@0.18.1
