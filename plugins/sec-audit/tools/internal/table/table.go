@@ -61,10 +61,22 @@ type Row struct {
 	Rel map[string]string
 }
 
+// LineError is a format error at one line of the table.
+type LineError struct {
+	Path string
+	// Line is 1-based; the header is line 1.
+	Line int
+	Err  error
+}
+
+func (e *LineError) Error() string { return fmt.Sprintf("%s:%d: %v", e.Path, e.Line, e.Err) }
+
+func (e *LineError) Unwrap() error { return e.Err }
+
 // Load reads and validates the findings table at path. It rejects a header
 // that is not the fixed column list followed by rel:<name> columns, and a
-// row whose cells break the table's format; it does not check that a score
-// matches its vector.
+// row whose cells break the table's format, each with a *LineError; it does
+// not check that a score matches its vector.
 func Load(path string) (*Table, error) {
 	data, err := os.ReadFile(path) //nolint:gosec // G304: reading the file the caller names is this function's job
 	if err != nil {
@@ -78,7 +90,7 @@ func Load(path string) (*Table, error) {
 	header := strings.Split(lines[0], "\t")
 	releases, err := checkHeader(header)
 	if err != nil {
-		return nil, fmt.Errorf("%s:1: %w", path, err)
+		return nil, &LineError{Path: path, Line: 1, Err: err}
 	}
 
 	t := &Table{Releases: releases}
@@ -88,7 +100,7 @@ func Load(path string) (*Table, error) {
 		}
 		r, err := parseRow(strings.Split(line, "\t"), len(header), releases)
 		if err != nil {
-			return nil, fmt.Errorf("%s:%d: %w", path, i+2, err)
+			return nil, &LineError{Path: path, Line: i + 2, Err: err}
 		}
 		t.Rows = append(t.Rows, r)
 	}

@@ -1,6 +1,7 @@
 package table_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -113,6 +114,18 @@ var _ = Describe("Load", func() {
 		f[2] = "open"
 		_, err := table.Load(write(stdHeader, row(f...)))
 		Expect(err).To(MatchError(And(ContainSubstring("findings.tsv:2"), ContainSubstring(`status "open"`))))
+	})
+
+	It("returns a format error as a *LineError naming the file and line", func() {
+		f := scoredRow("F-01")
+		f[2] = "open"
+		path := write(stdHeader, row(f...))
+		_, err := table.Load(path)
+		var lineErr *table.LineError
+		Expect(errors.As(err, &lineErr)).To(BeTrue(), "error %v", err)
+		Expect(lineErr.Path).To(Equal(path))
+		Expect(lineErr.Line).To(Equal(2))
+		Expect(lineErr.Err).To(MatchError(HavePrefix(`F-01: status "open"`)))
 	})
 
 	It("reads the rel:<name> columns as releases, in header order", Label("TestTableRelColumns"), func() {

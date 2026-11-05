@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# Build-on-first-use launcher for the Go tools in tools/cmd/.
+#
+#   run.sh <tool> [args...]
+#
+# It fails loud: every failure path prints to stderr and exits non-zero, so a
+# caller never mistakes a launcher failure for the tool's empty output. The
+# first build on a machine downloads the module's dependencies, so a network
+# failure lands here as a build failure, and says so.
+#
+# Correctness under parallel invocations comes from the per-PID temp plus
+# atomic mv; flock, where present, only dedupes the work.
+set -uo pipefail
+
+die() {
+  printf 'sec-audit tools: %s\n' "$1" >&2
+  exit 127
+}
+
+[ $# -ge 1 ] || die "usage: run.sh <tool> [args...]"
+tool=$1
+shift
+
+# The harness does not export CLAUDE_PLUGIN_ROOT to the shell a model runs
+# this from (observed in a subagent), so the plugin root falls back to the
+# directory above this script.
+root=${CLAUDE_PLUGIN_ROOT:-}
+if [ -z "$root" ]; then
+  root=$(CDPATH='' cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P) ||
+    die "cannot find the plugin root above ${BASH_SOURCE[0]}"
+fi
+src="$root/tools"
+[ -d "$src/cmd/$tool" ] || die "unknown tool '$tool' (no $src/cmd/$tool)"
+
+# Binaries live in the per-plugin data directory, never in CLAUDE_PLUGIN_ROOT:
+# the cache is a per-version directory that moves on every update and can be
+# reaped mid-session. Data outlives versions, so the staleness check below is
+# all that ties a cached binary to the sources of the version now installed.
+#
+# The harness names that directory after the plugin, but the model runs this
+# from its own shell, so CLAUDE_PLUGIN_DATA may hold ANOTHER installed
+# plugin's (observed: .../plugins/data/codex-openai-codex); only a basename of
+# this plugin's name, alone or followed by -<marketplace>, is used. The name
+# is a literal here rather than parsed out of .claude-plugin/plugin.json -- sed
+# would silently pick author.name if the keys were reordered -- and
+# internal/launcher's test pins this constant to the manifest.
+plugin=sec-audit
+data="${XDG_CACHE_HOME:-$HOME/.cache}/sec-audit-claude/tools"
+if [ -n "${CLAUDE_PLUGIN_DATA:-}" ]; then
+  case "$(basename "$CLAUDE_PLUGIN_DATA")" in
+  "$plugin" | "$plugin"-*) data="$CLAUDE_PLUGIN_DATA/tools" ;;
+  esac
+fi
+bin="$data/$tool"
+
+# The cache path holds a binary; nothing about it says WHICH binary, and the
+# mtime test cannot ask -- a rename, a half-finished copy, a leftover from
+# another checkout all read as fresh once they are newer than the sources. So
+# the launcher stamps what it built: a cksum over every source file, in a
+# stable order, and a cksum over the binary that came out. Both must still
+# hold, or the tool is rebuilt.
+#
+# This is an identity check, not a tamper boundary. The stamp sits in the same
+# user-writable directory as the binary, so whoever can plant one can rewrite
+# the other; a real boundary would have to keep the expected value somewhere
+# the launcher's inputs are not, such as inside CLAUDE_PLUGIN_ROOT.
+#
+# The sources are a tree, so a flat `cat "$src"/*.go` will not do. -print0,
+# sort -z and xargs -0 are GNU and BSD but not POSIX: when one is missing the
+# pipeline fails (pipefail) or reads zero bytes, and staleness falls back to
+# the mtime test alone.
+#
+# The sum covers this tool's own package set -- cmd/<tool> plus the module
+# packages it imports, which is what `go list -deps` knows -- so adding or
+# editing one tool does not make every other cached binary stale.
+#
+# When go list cannot answer -- no toolchain installed, or a tree that does not
+# parse -- srcfiles fails and staleness falls back to the mtime test, same as a
+# missing -print0. Summing the whole tree instead would be worse than useless
+# here: that sum can never equal a stamp written from one tool's packages, so
+# every cached binary would read as stale and a machine without Go would be
+# told to build rather than handed the binary it already has.
+srcfiles() {
+  local root d
+  local -a dirs=()
+  root=$(cd "$src" && pwd -P 2>/dev/null) || return 1
+  while IFS= read -r d; do
+    case "$d/" in "$root"/*) dirs+=("$d") ;; esac
+  done < <(cd "$src" && go list -deps -f '{{.Dir}}' "./cmd/$tool" 2>/dev/null)
+  [ ${#dirs[@]} -gt 0 ] || return 1
+  find "${dirs[@]}" -maxdepth 1 -name '*.go' -print0 2>/dev/null
+  printf '%s\0' "$src/go.mod"
+}
+
+srcsum() {
+  local fp
+  fp=$(srcfiles |
+    LC_ALL=C sort -z 2>/dev/null | xargs -0 cat 2>/dev/null | cksum) || return 1
+  case "$fp" in
+  *' 0') return 1 ;;
+  esac
+  printf '%s' "$fp"
+}
+
+binsum() { cksum <"$bin" 2>/dev/null; }
+
+stale() {
+  [ ! -x "$bin" ] && return 0
+  local sfp bfp
+  if sfp=$(srcsum) && bfp=$(binsum); then
+    [ "$(cat "$bin.fp" 2>/dev/null)" != "$sfp $bfp" ]
+    return
+  fi
+  # The parens matter: without them -o binds looser than the implicit -a and
+  # every .go file matches regardless of mtime, so the tool rebuilds on every
+  # single invocation.
+  [ -n "$(find "$src" \( -name '*.go' -o -name go.mod \) -newer "$bin" -print -quit 2>/dev/null)" ]
+}
+
+# The source cksum is taken BEFORE the build so it describes what go build
+# read: sources edited mid-build stamp as the older value and the next
+# invocation rebuilds, where stamping afterwards would record the edit as
+# already built. A stamp that cannot be written is removed rather than left
+# outdated -- that costs a rebuild, never a wrong binary.
+build() {
+  local sfp bfp
+  sfp=$(srcsum) || sfp=
+  if (cd "$src" && go build -o "$bin.tmp.$$" "./cmd/$tool") && mv -f "$bin.tmp.$$" "$bin"; then
+    if [ -n "$sfp" ] && bfp=$(binsum) &&
+      printf '%s\n' "$sfp $bfp" >"$bin.fp.tmp.$$" 2>/dev/null; then
+      mv -f "$bin.fp.tmp.$$" "$bin.fp" 2>/dev/null || rm -f "$bin.fp.tmp.$$" "$bin.fp"
+    else
+      rm -f "$bin.fp.tmp.$$" "$bin.fp"
+    fi
+    return 0
+  fi
+  rm -f "$bin.tmp.$$"
+  return 1
+}
+
+failed="build failed for '$tool'; the first build downloads Go modules, so check network access and the go output above (run: cd $src && go build ./cmd/$tool)"
+if stale; then
+  command -v go >/dev/null 2>&1 || die "go toolchain not found; cannot build '$tool'"
+  mkdir -p "$data" || die "cannot create $data"
+  if command -v flock >/dev/null 2>&1; then
+    exec 9>"$bin.lock" || die "cannot open build lock"
+    flock 9 || die "cannot take build lock"
+    if stale; then
+      build || die "$failed"
+    fi
+    exec 9>&-
+  else
+    build || die "$failed"
+  fi
+fi
+
+exec "$bin" "$@"

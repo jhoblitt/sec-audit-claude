@@ -1,0 +1,8 @@
+# go-conventions' Go entries, here rather than at the repository root
+# because this directory is the module's root.
+/bin/
+/dist/
+coverage.out
+# What `go build ./cmd/audit-gate` leaves in the module root, the command
+# run.sh names when a build fails.
+/audit-gate
