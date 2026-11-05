@@ -18,9 +18,11 @@ The audit confirmed **3 scored findings**: 0 Critical, 2 High, 0 Medium and 1 Lo
 
 | ID | CVSS 3.1 | CVSS 4.0 | Severity | Finding | Affected (v1.0) | Found by | Default exposure |
 |---|---|---|---|---|---|---|---|
-| [F-01](#f-01) | 7.1 | — | High | Widget export follows symlinks out of the export root | yes | claude | default |
-| [F-02](#f-02) | 7.1 | — | High | Widget server trusts a client-supplied role header | yes | gpt | opt-in |
-| [F-03](#f-03) | 3.3 | — | Low | Widget cache keys are truncated digests | yes | claude | default |
+| [F-01](#f-01) | 7.1 | — | High | Widget export follows symlinks out of the export root | yes | Claude Opus 5.5 | default |
+| [F-02](#f-02) | 7.1 | — | High | Widget server trusts a client-supplied role header | yes | Kimi K3 | opt-in |
+| [F-03](#f-03) | 3.3 | — | Low | Widget cache keys are truncated digests | yes | Claude Opus 5.5 | default |
+
+<a id="findings"></a>
 
 ## Detailed findings
 
@@ -60,9 +62,13 @@ The audit confirmed **3 scored findings**: 0 Critical, 2 High, 0 Medium and 1 Lo
 
 **Defect.** See [cache.py line 11](https://github.com/example/widget/blob/v1.0.0/src/widget/cache.py#L11).
 
-<a id="hardening-index"></a>
+<a id="hardening"></a>
 
 ## Hardening notes
+
+<a id="hardening-index"></a>
+
+### Index
 
 None.
 

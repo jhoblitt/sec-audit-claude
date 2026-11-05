@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	f01Overview = "| [F-01](#f-01) | 7.1 | 6.9 | High | Widget export follows symlinks out of the export root | yes / yes | claude, gpt | default |"
-	f02Overview = "| [F-02](#f-02) | 5.5 | 5.1 | Medium | Widget cache keys collide across users | partly / yes | gpt | default |"
+	f01Overview = "| [F-01](#f-01) | 7.1 | 6.9 | High | Widget export follows symlinks out of the export root | yes / yes | Claude Opus 5.5, Kimi K3 | default |"
+	f02Overview = "| [F-02](#f-02) | 5.5 | 5.1 | Medium | Widget cache keys collide across users | partly / yes | Kimi K3 | default |"
 	f01CVSS31   = "C:H/I:L/A:N` — **7.1 High** |"
 	f02Heading  = "### F-02 — Widget cache keys collide across users"
 	f04Section  = "<a id=\"f-04\"></a>\n\n### F-04 — Widget upload accepts unbounded bodies\n\nFixed before this audit.\n\n"
@@ -110,7 +110,7 @@ var _ = Describe("the consistency check", func() {
 			"F-04: retired, but the report has a finding section for it"),
 		Entry("as an overview row",
 			func() {
-				replace(&f.report, f02Overview, f02Overview+"\n| F-04 | — | — | — | Widget upload accepts unbounded bodies | no / no | claude | default |")
+				replace(&f.report, f02Overview, f02Overview+"\n| F-04 | — | — | — | Widget upload accepts unbounded bodies | no / no | Claude Opus 5.5 | default |")
 			},
 			func() string { return f.opts.Report },
 			"F-04: retired, but the report has an overview row for it"),
@@ -244,6 +244,17 @@ var _ = Describe("the consistency check", func() {
 			))
 		})
 
+		// unanchored is what the anchors check reports once #f-02 has no
+		// anchor: one problem per link to it.
+		unanchored := func() []any {
+			GinkgoHelper()
+			var want []any
+			for _, at := range f.reportLines("(#f-02)") {
+				want = append(want, problem("anchors", at, "link to #f-02 has no"))
+			}
+			return want
+		}
+
 		DescribeTable("reports a section heading with no anchor of its own, and still checks it against its row",
 			func(ctx SpecContext, edit func(), heading string, also func() []any) {
 				edit()
@@ -275,15 +286,11 @@ var _ = Describe("the consistency check", func() {
 			Entry("a scored ID",
 				func() { replace(&f.report, "<a id=\"f-02\"></a>\n\n", "") },
 				f02Heading,
-				func() []any {
-					return []any{problem("anchors", f.reportLine(f02Overview), "link to #f-02 has no")}
-				}),
+				unanchored),
 			Entry("a scored ID whose anchor is in another case",
 				func() { replace(&f.report, "<a id=\"f-02\"></a>", "<a id=\"F-02\"></a>") },
 				f02Heading,
-				func() []any {
-					return []any{problem("anchors", f.reportLine(f02Overview), "link to #f-02 has no")}
-				}),
+				unanchored),
 			Entry("a second section for a scored ID",
 				func() {
 					replace(&f.report, "<a id=\"hardening\"></a>", f02Heading+"\n\nAgain.\n\n<a id=\"hardening\"></a>")
@@ -356,12 +363,12 @@ var _ = Describe("the consistency check", func() {
 
 		It("compares each cell with the table", func(ctx SpecContext) {
 			replace(&f.report, f01Overview,
-				"| [F-01](#f-01) | 7.1 | 6.9 | Medium | Widget export follows links | no / yes | claude | opt-in |")
+				"| [F-01](#f-01) | 7.1 | 6.9 | Medium | Widget export follows links | no / yes | Claude Opus 5.5 | opt-in |")
 			Expect(f.check(ctx)).To(ConsistOf(
 				problem("consistency", f.opts.Report, `F-01: overview severity is "Medium", table has "High"`),
 				problem("consistency", f.opts.Report, `F-01: overview title is "Widget export follows links", table has "Widget export follows symlinks out of the export root"`),
 				problem("consistency", f.opts.Report, `F-01: overview verdict for v0.9 is "ABSENT", table has "PRESENT"`),
-				problem("consistency", f.opts.Report, `F-01: overview found by is "claude", table has "claude, gpt"`),
+				problem("consistency", f.opts.Report, `F-01: overview found by is "Claude Opus 5.5", table has "Claude Opus 5.5, Kimi K3"`),
 				problem("consistency", f.opts.Report, `F-01: overview default exposure is "opt-in", table has "default"`),
 			))
 		})

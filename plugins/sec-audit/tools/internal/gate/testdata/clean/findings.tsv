@@ -1,6 +1,6 @@
 id	cluster	status	cvss31	score31	sev31	cvss40	score40	sev40	title	principal	default_exposure	found_by	confirmed_by	rel:v0.9	rel:v1.0
-F-01	C-001	scored	CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:L/A:N	7.1	High	CVSS:4.0/AV:L/AC:L/AT:N/PR:L/UI:N/VC:H/VI:L/VA:N/SC:N/SI:N/SA:N	6.9	Medium	Widget export follows symlinks out of the export root	authenticated user	default	claude, gpt	claude	PRESENT	PRESENT
-F-02	C-002	scored	CVSS:3.1/AV:A/AC:L/PR:N/UI:R/S:U/C:L/I:L/A:L	5.5	Medium	CVSS:4.0/AV:A/AC:L/AT:N/PR:N/UI:P/VC:L/VI:L/VA:L/SC:N/SI:N/SA:N	5.1	Medium	Widget cache keys collide across users	peer on the local network	default	gpt	claude	PARTIAL	PRESENT
-F-03	C-003	scored	CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:N	7.1	High	CVSS:4.0/AV:L/AC:L/AT:P/PR:L/UI:N/VC:L/VI:H/VA:N/SC:N/SI:N/SA:N	5.8	Medium	Widget server trusts a client-supplied role header	authenticated user	opt-in	claude	claude, gpt	ABSENT	PRESENT
+F-01	C-001	scored	CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:L/A:N	7.1	High	CVSS:4.0/AV:L/AC:L/AT:N/PR:L/UI:N/VC:H/VI:L/VA:N/SC:N/SI:N/SA:N	6.9	Medium	Widget export follows symlinks out of the export root	authenticated user	default	Claude Opus 5.5, Kimi K3	Claude Opus 5.5, Kimi K3	PRESENT	PRESENT
+F-02	C-002	scored	CVSS:3.1/AV:A/AC:L/PR:N/UI:R/S:U/C:L/I:L/A:L	5.5	Medium	CVSS:4.0/AV:A/AC:L/AT:N/PR:N/UI:P/VC:L/VI:L/VA:L/SC:N/SI:N/SA:N	5.1	Medium	Widget cache keys collide across users	peer on the local network	default	Kimi K3	Claude Opus 5.5	PARTIAL	PRESENT
+F-03	C-003	scored	CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:N	7.1	High	CVSS:4.0/AV:L/AC:L/AT:P/PR:L/UI:N/VC:L/VI:H/VA:N/SC:N/SI:N/SA:N	5.8	Medium	Widget server trusts a client-supplied role header	authenticated user	opt-in	Claude Opus 5.5	Claude Opus 5.5, Kimi K3	ABSENT	PRESENT
 F-04	C-004	retired	-	-	-	-	-	-	Widget upload accepts unbounded bodies	-	-	-	-	-	-
-H-01	C-005	hardening	-	-	-	-	-	-	Widget server logs request headers at debug level	local user	opt-in	claude	claude	-	-
+H-01	C-005	hardening	-	-	-	-	-	-	Widget server logs request headers at debug level	local user	opt-in	Claude Opus 5.5	Claude Opus 5.5	-	-
