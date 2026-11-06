@@ -1,0 +1,20 @@
+# Managed by github-conventions (references/workflows.md); language plugins
+# append their own package-ecosystem entries below this one.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+  # The Go entry, from go-conventions (references/ci.md, Dependabot), which
+  # owns how it lands in .github/dependabot.yml.
+  - package-ecosystem: gomod
+    directory: /plugins/sec-audit/tools
+    schedule:
+      interval: weekly
+    groups:
+      go-dependencies:
+        patterns: ["*"]
