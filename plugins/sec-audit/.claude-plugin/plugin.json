@@ -1,7 +1,7 @@
 {
   "name": "sec-audit",
   "displayName": "Security Audit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Comprehensive security audit of a repository from one request: every source a finding may depend on fetched rather than skipped, file-by-file coverage checked mechanically, discovery fanned out across agents and models, every candidate verified for defect and exploitability, a gap sweep over the audit's own coverage, and a deterministic gate on the finished report",
   "author": {
     "name": "Joshua Hoblitt",
