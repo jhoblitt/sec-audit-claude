@@ -20,7 +20,9 @@ git -c core.quotePath=false -C staging/target ls-files | LC_ALL=C sort > coverag
 name holding a control character, a double quote or a backslash, and
 `audit-gate coverage` takes the path to be the first field after `READ`, so a
 name holding whitespace never matches. List every such path in the ledger,
-and check its READ line by hand with `grep -F`.
+and check its READ line by hand, taking the path from the list by its line
+number rather than typing it (`coordinator.md`, The shell):
+`grep -nF -f <(sed -n '<N>p' coverage/files.txt) <MANIFESTFILE>`.
 
 ## Exclusions
 
@@ -64,9 +66,9 @@ directory whole; rerun the union check after any edit.
 
 A binary file stays in its scope. Its reviewer identifies it (`file`), checks
 it for embedded credentials or executable content, and writes its READ line
-like any other. A symlink (mode `120000` in `git ls-files -s`) is reviewed as
-its link text, never followed: a link that resolves outside the tree is a
-candidate, and its target is never opened.
+like any other. So does a symlink (mode `120000` in `git ls-files -s`), which
+staging checks out as a plain file holding its link text; every agent judges
+it by that text (`briefs/agent-rules.md`, Links in the staged trees).
 
 Scope names (`S01`, `S02`, …) are the stem of candidate IDs: `S01-03` from a
 Claude attacker, or `GPT-S01-03` from another model.
@@ -89,12 +91,22 @@ and their empty output, as the stage's exit evidence in the ledger.
 
 Every reviewer's NOTES file (`*.notes.md`), whatever its model, carries these
 lines. Each sits on a line of its own, bare or as a Markdown list item, and is
-appended as the work is done:
+appended as the work is done. Every brief whose agent writes them points
+here. Their form is what the checks below and the gap sweep's commands read:
+
+- The separator is a space, an em dash and a space (` — `; ` -- ` and ` - `
+  are read too). The path or area before it holds no separator of its own,
+  because the commands split each line at the first one.
+- A path is bare, without backticks or quotes, relative to the target's
+  root, and spelled as the scope list spells it.
+
+The lines:
 
 - `READ <repo-relative path> <line count> — <verdict>`: one for each file in
   the scope, written only once the whole file has been read. The path is
   spelled as the scope list spells it, the count is the one
-  `coverage/lines.txt` gives, and the verdict is `clean` or the IDs of the candidates the file produced.
+  `coverage/lines.txt` gives, and the verdict is `clean` or the IDs of the
+  candidates the file produced, separated by commas, and nothing else.
   A READ line claims that the file was read in full. A file that was grepped,
   skimmed or read in part gets no READ line. A file outside the scope that a
   trace followed is cited in the candidate, and gets no READ line either.
@@ -103,8 +115,9 @@ appended as the work is done:
   attack.
 - `PARTIAL <area or path> — <what was not done>`: work left unfinished, at any
   depth. A file with a PARTIAL line and no READ line is a missing file. An
-  area marked PARTIAL goes to the gap sweep, and must be closed before the
-  completeness gate passes.
+  area marked PARTIAL goes to the gap sweep, and must be closed, or accepted
+  by the owner when the round cap stops the sweep (`gap-sweep.md`, When it
+  stops), before the completeness gate passes.
 
 ## The coverage check
 
@@ -112,14 +125,14 @@ appended as the work is done:
 lines:
 
 ```sh
-bash "${CLAUDE_PLUGIN_ROOT}/tools/run.sh" audit-gate coverage --scope NAME=LISTFILE:MANIFESTFILE [--scope NAME=LISTFILE:MANIFESTFILE]... [--json]
+CLAUDE_PLUGIN_ROOT="<plugin root>" bash "<plugin root>/tools/run.sh" audit-gate coverage --scope NAME=LISTFILE:MANIFESTFILE [--scope NAME=LISTFILE:MANIFESTFILE]... [--json]
 ```
 
 Give one `--scope` per reviewer per scope, named after its candidate-ID stem,
 for example:
 
 ```sh
-bash "${CLAUDE_PLUGIN_ROOT}/tools/run.sh" audit-gate coverage \
+CLAUDE_PLUGIN_ROOT="<plugin root>" bash "<plugin root>/tools/run.sh" audit-gate coverage \
   --scope S01=coverage/scopes/S01.txt:discovery/claude/S01.notes.md \
   --scope GPT-S01=coverage/scopes/S01.txt:discovery/gpt/S01.notes.md
 ```
@@ -133,14 +146,17 @@ bash "${CLAUDE_PLUGIN_ROOT}/tools/run.sh" audit-gate coverage \
   because its reviewer never started.
 
 The gate only sees whether a READ line exists. Run this alongside it, over
-every MANIFESTFILE the `--scope` flags name; it too must print nothing,
-since a READ line whose verdict admits a partial read counts as a missing
-file, whatever separator or indentation it uses. Like the gate, it takes the
-first field after `READ` as the path and searches only what follows, so a
-path such as `pkg/sampler.go` is not flagged:
+every MANIFESTFILE the `--scope` flags name; it too must print nothing. It
+prints every READ line that is not exactly a path, a line count, the
+separator, and a verdict of `clean` or of candidate IDs separated by
+commas. The verdict is where a partial read gets admitted, in whatever
+words ("skimmed", "only the first 400 lines"), so a READ line it prints
+counts as a missing file. Like the gate, it takes the first field after
+`READ` as the path and never judges it, so a path such as `pkg/sampler.go`
+is not flagged:
 
 ```sh
-grep -inE '^[[:space:]]*([-*][[:space:]]+)?READ[[:space:]]+[^[:space:]]+[[:space:]].*(grep|skim|partial|sampl|not read)' <MANIFESTFILE>...
+grep -HnE '^[[:space:]]*([-*][[:space:]]+)?READ[[:space:]]' <MANIFESTFILE>... | grep -vE '^[^:]*:[0-9]+:[[:space:]]*([-*][[:space:]]+)?READ[[:space:]]+[^[:space:]]+[[:space:]]+[0-9]+[[:space:]]+(—|--?)[[:space:]]+(clean|[A-Z][A-Z0-9]*(-[A-Z0-9]+)*-[0-9]+[a-z]?([[:space:]]*,[[:space:]]*[A-Z][A-Z0-9]*(-[A-Z0-9]+)*-[0-9]+[a-z]?)*)[[:space:]]*$'
 ```
 
 A problem is never carried forward. Its files go back to their reviewer, told

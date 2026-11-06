@@ -31,6 +31,8 @@ id cluster status cvss31 score31 sev31 cvss40 score40 sev40 title principal defa
   scored. A verdict's evidence and notes go in the section prose.
 - `title` is one specific line: what principal can do what, through what. The
   section heading, the overview and the hardening index repeat it verbatim.
+- `principal` starts with its class in `scoring/CONVENTIONS.md` and a colon,
+  then every other prerequisite: `P1: …`.
 - `default_exposure` is short, such as `default` or `opt-in (<knob>)`,
   because the overview prints it.
 - `found_by` and `confirmed_by` follow the attribution rule below.
@@ -46,6 +48,8 @@ id cluster status cvss31 score31 sev31 cvss40 score40 sev40 title principal defa
   issued, by this audit or a prior one.
 - On a re-audit, a finding that is still present keeps its prior ID, prefix
   included.
+- A `refuted` row's `id` is its cluster ID (`C-007`), so that no finding ID
+  is spent on it.
 - No level-3 or level-4 heading other than a section's holds an ID-shaped
   token, a CVE number included: the gate reads such a heading as a section.
 
@@ -316,11 +320,10 @@ itself is `completeness-gate.md`'s.
   (`cut -f3,6 data/findings.tsv | sort | uniq -c`), and method counts from the
   workspace files that hold them.
 - **Attribution.** `found_by` and `confirmed_by` name models, never families:
-  `Claude Opus 5.5`, not `Claude`. `found_by` is recorded at deduplication and
-  credits only sources blind to the finding list. A source that had the list
-  is credited for a new finding, never for rediscovering a listed one. Where
-  credited sources share a vendor, the summary says that their agreement is
-  not independent.
+  `Claude Opus 5.5`, not `Claude`. Who earns credit in `found_by` is
+  `discovery.md`'s (Found by), recorded at deduplication. Where credited
+  sources share a vendor, the summary says that their agreement is not
+  independent.
 - **Code links.** Every link into source is
   `https://github.com/<owner>/<repo>/blob/<ref>/<path>[?plain=1][#L<a>[-L<b>]]`.
   Its `<ref>` is the one `staging/MANIFEST.tsv` records for that repository,
@@ -335,15 +338,30 @@ itself is `completeness-gate.md`'s.
 
 ## Assembly
 
-No tool renders the report.
+No tool renders the report: its writers and the coordinator write its parts,
+and one command puts them together.
 
 1. Writers write each finding to `report/sections/<ID>.md` and each hardening
    note to `report/hardening/<ID>.md`, copying table values from the row.
-2. The coordinator writes the other parts. The summary's count sentences and
-   the overview are written from `data/findings.tsv`, by the commands above,
-   never from the sections.
-3. `report/REPORT.md` is the parts in outline order: finding sections in
-   overview order, hardening notes in ID order.
+2. The coordinator writes each other part to its own file under
+   `report/parts/`, from its skeleton above: `header.md` (part 1),
+   `summary.md` (2), `prior-audit.md` (4), `scope.md` (5), `findings.md`
+   (7's anchor, heading and paragraph), `hardening.md` (8's anchor, heading
+   and paragraph), `not-reported.md` (9), `limitations.md` (10) and
+   `remediation.md` (11). The summary's count sentences come from
+   `data/findings.tsv` by the Counts command, never from the sections.
+3. This command does the rest. It renders the overview (part 3) and the
+   hardening index from the table into `report/parts/overview.md` and
+   `report/parts/hardening-index.md`, by the rules of parts 3 and 8, takes
+   part 6 from `scoring/CONVENTIONS.md`, and writes `report/REPORT.md` in
+   outline order: finding sections in overview order, hardening notes in ID
+   order. It writes nothing, and names the file, when a part or a section is
+   missing:
+
+   ```sh
+   (p=report/parts; for f in header summary prior-audit scope findings hardening not-reported limitations remediation; do [ -s "$p/$f.md" ] || { echo "missing $p/$f.md"; exit 1; }; done; s=$(mktemp) && h=$(mktemp) && { head -1 data/findings.tsv; awk -F'\t' 'NR > 1 && $3 == "scored"' data/findings.tsv | LC_ALL=C sort -t$'\t' -k5,5gr -k8,8gr -k1,1V; } > "$s" && awk -F'\t' 'NR > 1 && $3 == "hardening"' data/findings.tsv | LC_ALL=C sort -t$'\t' -k1,1V > "$h" || exit 1; for id in $(tail -n +2 "$s" | cut -f1); do [ -s "report/sections/$id.md" ] || { echo "missing report/sections/$id.md"; exit 1; }; done; for id in $(cut -f1 "$h"); do [ -s "report/hardening/$id.md" ] || { echo "missing report/hardening/$id.md"; exit 1; }; done; awk -F'\t' 'function e(x) {gsub(/\|/, "\\|", x); return x} function d(x) {return x == "-" ? "—" : x} function v(x) {return x == "PRESENT" ? "yes" : x == "PARTIAL" ? "partly" : x == "ABSENT" ? "no" : x} NR == 1 {for (i = 15; i <= NF; i++) r = r (i > 15 ? " / " : "") substr($i, 5); print "<a id=\"overview\"></a>\n\n## Finding overview\n\n| ID | CVSS 3.1 | CVSS 4.0 | Severity | Finding | Affected (" r ") | Found by | Default exposure |\n|---|---|---|---|---|---|---|---|"; next} {a = ""; for (i = 15; i <= NF; i++) a = a (i > 15 ? " / " : "") v($i); print "| [" $1 "](#" tolower($1) ") | " d($5) " | " d($8) " | " $6 " | " e($10) " | " a " | " e($13) " | " e($12) " |"}' "$s" > "$p/overview.md" && awk -F'\t' 'function e(x) {gsub(/\|/, "\\|", x); return x} BEGIN {print "<a id=\"hardening-index\"></a>\n\n### Index\n"} NR == 1 {print "| ID | Note |\n|---|---|"} {print "| [" $1 "](#" tolower($1) ") | " e($10) " |"} END {print (NR ? "\n### Notes" : "None.")}' "$h" > "$p/hardening-index.md" && { for f in header summary overview prior-audit scope; do cat "$p/$f.md"; echo; done; printf '<a id="scoring"></a>\n\n## Scoring conventions\n\n'; cat scoring/CONVENTIONS.md; echo; cat "$p/findings.md"; echo; for id in $(tail -n +2 "$s" | cut -f1); do cat "report/sections/$id.md"; echo; done; cat "$p/hardening.md"; echo; cat "$p/hardening-index.md"; echo; for id in $(cut -f1 "$h"); do cat "report/hardening/$id.md"; echo; done; for f in not-reported limitations remediation; do cat "$p/$f.md"; echo; done; } > report/REPORT.md)
+   ```
+
 4. After any table change, the coordinator re-copies the values it touches
-   and re-assembles. `audit-gate check` (`completeness-gate.md`) compares
-   every copy with the table.
+   into the parts and sections, and runs the command again. `audit-gate check`
+   (`completeness-gate.md`) compares every copy with the table.

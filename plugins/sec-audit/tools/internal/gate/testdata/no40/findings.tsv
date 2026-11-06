@@ -2,4 +2,4 @@ id	cluster	status	cvss31	score31	sev31	cvss40	score40	sev40	title	principal	defa
 F-01	C-001	scored	CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:L/A:N	7.1	High	-	-	-	Widget export follows symlinks out of the export root	authenticated user	default	Claude Opus 5.5	Kimi K3	PRESENT
 F-02	C-002	scored	CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:N	7.1	High	-	-	-	Widget server trusts a client-supplied role header	authenticated user	opt-in	Kimi K3	Claude Opus 5.5	PRESENT
 F-03	C-003	scored	CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:L/I:N/A:N	3.3	Low	-	-	-	Widget cache keys are truncated digests	local user	default	Claude Opus 5.5	Claude Opus 5.5	PRESENT
-F-04	C-004	refuted	-	-	-	-	-	-	Widget import trusts archive member names	-	-	-	-	-
+C-004	C-004	refuted	-	-	-	-	-	-	Widget import trusts archive member names	-	-	-	-	-

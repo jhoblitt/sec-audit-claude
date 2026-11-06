@@ -78,4 +78,4 @@ None.
 
 | ID | Status | Reason |
 |---|---|---|
-| F-04 | refuted | The import path normalizes member names before use. |
+| C-004 | refuted | The import path normalizes member names before use. |
