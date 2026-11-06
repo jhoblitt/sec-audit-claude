@@ -14,10 +14,10 @@ and every command runs from its root:
 LEDGER.md  decisions.md  scoring/CONVENTIONS.md  .venv/  tmp/
 staging/   MANIFEST.tsv  DEPS.txt  target/  deps/<owner>__<repo>/  releases/<rel>/  prior/
 coverage/  files.txt  excluded.tsv  lines.txt  scopes/<SCOPE>.txt
-discovery/<SOURCE>/<SCOPE>.md and <SCOPE>.notes.md    SOURCE: claude, or a model slug
-clusters.tsv  claims/<CLUSTER>.md  verify/<BATCH>.md and .notes.md  xcheck/<BATCH>-<model>.md
-adjudication/<NAME>.md  gapsweep/round-<N>/  live/LIVE.md  affected/<BATCH>.tsv
-data/findings.tsv  report/sections/<ID>.md  report/hardening/<ID>.md  report/REPORT.md
+discovery/<SOURCE>/<SCOPE>.md, .notes.md and .log    SOURCE: claude, or a model slug
+clusters.tsv  claims/<CLUSTER>.md  verify/<BATCH>.md, .notes.md and <BATCH>/  xcheck/<BATCH>-<slug>.md and .log
+adjudication/<NAME>.md  gapsweep/round-<N>/  live/LIVE.md  calibration/  affected/<BATCH>.tsv
+data/findings.tsv  report/sections/<ID>.md  report/hardening/<ID>.md  report/REPORT.md  editorial/<BATCH>.md
 ```
 
 ## The ledger
